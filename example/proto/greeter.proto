@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+// NOTE: intentionally no `option go_package` and a bare package name —
+// these get filled in by the generator's managed mode via CLI flags.
+package greeter.v1;
+
+import "google/api/annotations.proto";
+import "buf/validate/validate.proto";
+
+service Greeter {
+  // Unary RPC with a REST/HTTP mapping consumed by the gateway + OpenAPI.
+  rpc SayHello(HelloRequest) returns (HelloReply) {
+    option (google.api.http) = {
+      post: "/v1/greeter/hello"
+      body: "*"
+    };
+  }
+
+  rpc GetGreeting(GetGreetingRequest) returns (HelloReply) {
+    option (google.api.http) = {
+      get: "/v1/greeter/{name}"
+    };
+  }
+}
+
+message HelloRequest {
+  // protovalidate constraints: enforced at runtime, no codegen needed.
+  string name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 40}];
+  int32 times = 2 [(buf.validate.field).int32 = {gte: 1, lte: 10}];
+}
+
+message GetGreetingRequest {
+  string name = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message HelloReply {
+  string message = 1;
+}

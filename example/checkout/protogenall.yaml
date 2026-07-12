@@ -1,0 +1,16 @@
+# Declarative config for the checkout example.
+# Run from this directory:  protogenall --config protogenall.yaml
+proto_paths:
+  - proto
+inputs:
+  - proto            # a directory is walked recursively for *.proto
+out: ../../genshop
+go_package_prefix: github.com/dvislobokov/protogen/genshop
+openapi:
+  title: Checkout API
+  version: 1.0.0
+generators:
+  - messages
+  - grpc
+  - gateway
+  - openapiv3

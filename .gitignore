@@ -1,0 +1,17 @@
+# Binaries
+*.exe
+*.exe~
+/dist/
+protogenall
+
+# Descriptor sets / build artifacts
+*.binpb
+
+# Editor / OS / tooling
+.DS_Store
+*.swp
+.idea/
+.claude/
+
+# Note: gen/, genshop/, genchat/ are committed on purpose — the examples and
+# tests import them, and they demonstrate the tool's output.

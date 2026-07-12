@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package chat.v1;
+
+import "google/api/annotations.proto";
+
+// Chat exercises all four RPC kinds.
+service Chat {
+  // unary
+  rpc Send(Message) returns (Ack) {
+    option (google.api.http) = { post: "/v1/messages" body: "*" };
+  }
+  // server streaming
+  rpc Subscribe(SubscribeRequest) returns (stream Message) {
+    option (google.api.http) = { get: "/v1/rooms/{room}/messages" };
+  }
+  // client streaming
+  rpc Upload(stream Chunk) returns (UploadSummary);
+  // bidirectional streaming
+  rpc Converse(stream Message) returns (stream Message);
+}
+
+message Message {
+  string room = 1;
+  string author = 2;
+  string text = 3;
+}
+
+message Ack { string id = 1; }
+
+message SubscribeRequest { string room = 1; }
+
+message Chunk { bytes data = 1; }
+
+message UploadSummary { int64 total_bytes = 1; }

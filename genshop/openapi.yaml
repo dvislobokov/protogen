@@ -1,0 +1,223 @@
+# Generated with protoc-gen-openapi
+# https://github.com/google/gnostic/tree/master/cmd/protoc-gen-openapi
+
+openapi: 3.0.3
+info:
+    title: Checkout API
+    description: |-
+        Checkout demonstrates a single POST endpoint exercising a broad range of
+         protovalidate constraints, optional fields, enums, nested and repeated
+         messages — and the OpenAPI + validation output they produce.
+    version: 1.0.0
+paths:
+    /v1/orders:
+        post:
+            tags:
+                - Checkout
+            operationId: Checkout_PlaceOrder
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/PlaceOrderRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/PlaceOrderResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+                "400":
+                    description: One or more validation errors occurred.
+                    content:
+                        application/problem+json:
+                            schema:
+                                $ref: '#/components/schemas/ValidationProblemDetails'
+components:
+    schemas:
+        Address:
+            type: object
+            properties:
+                line1:
+                    type: string
+                    minLength: 1
+                city:
+                    type: string
+                    minLength: 1
+                country:
+                    type: string
+                    minLength: 2
+                    maxLength: 2
+                postalCode:
+                    type: string
+                    minLength: 3
+                    maxLength: 10
+        GoogleProtobufAny:
+            type: object
+            properties:
+                '@type':
+                    type: string
+                    description: The type of the serialized message.
+            additionalProperties: true
+            description: Contains an arbitrary serialized message along with a @type that describes the type of the serialized message.
+        LineItem:
+            type: object
+            properties:
+                sku:
+                    type: string
+                    minLength: 1
+                    pattern: ^[A-Z0-9-]+$
+                quantity:
+                    type: integer
+                    format: int32
+                    minimum: 1
+                unitPrice:
+                    type: number
+                    format: double
+                    minimum: 0
+                    exclusiveMinimum: true
+        PlaceOrderRequest:
+            required:
+                - paymentToken
+                - shippingAddress
+                - customerEmail
+            type: object
+            properties:
+                customerEmail:
+                    type: string
+                    description: required + email format
+                    format: email
+                customerName:
+                    type: string
+                    description: length bounds
+                    minLength: 2
+                    maxLength: 60
+                idempotencyKey:
+                    type: string
+                    description: uuid format
+                    format: uuid
+                promoNote:
+                    type: string
+                    description: regex pattern
+                    pattern: ^[A-Za-z0-9 ]{0,64}$
+                currency:
+                    type: integer
+                    description: 'enum: must be a defined value and not the zero/unspecified one'
+                    format: enum
+                    enum:
+                        - 1
+                        - 2
+                        - 3
+                    x-enum-varnames:
+                        - USD
+                        - EUR
+                        - GBP
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/LineItem'
+                    description: repeated with collection bounds; at least one item
+                    minItems: 1
+                    maxItems: 50
+                discountPercent:
+                    type: integer
+                    description: numeric range
+                    format: int32
+                    minimum: 0
+                    maximum: 100
+                couponCode:
+                    type: string
+                    description: proto3 optional — present-or-absent, and NOT required
+                    maxLength: 20
+                shippingSpeed:
+                    type: integer
+                    description: enum, defined values only
+                    format: enum
+                    enum:
+                        - 0
+                        - 1
+                        - 2
+                    x-enum-varnames:
+                        - SHIPPING_SPEED_UNSPECIFIED
+                        - STANDARD
+                        - EXPRESS
+                shippingAddress:
+                    allOf:
+                        - $ref: '#/components/schemas/Address'
+                    description: nested message, required
+                acceptTerms:
+                    type: boolean
+                    description: must be true to proceed
+                    enum:
+                        - true
+                requestedDelivery:
+                    type: string
+                    description: free-form optional timestamp (no constraint) — shows a well-known message field
+                    format: date-time
+                paymentToken:
+                    writeOnly: true
+                    type: string
+                    description: 'field_behavior: write-only + required (never echoed back; must be supplied)'
+        PlaceOrderResponse:
+            type: object
+            properties:
+                orderId:
+                    readOnly: true
+                    type: string
+                    description: 'field_behavior: server-assigned, read-only in the API surface'
+                currency:
+                    type: integer
+                    format: enum
+                    enum:
+                        - 0
+                        - 1
+                        - 2
+                        - 3
+                    x-enum-varnames:
+                        - CURRENCY_UNSPECIFIED
+                        - USD
+                        - EUR
+                        - GBP
+        Status:
+            type: object
+            properties:
+                code:
+                    type: integer
+                    description: The status code, which should be an enum value of [google.rpc.Code][google.rpc.Code].
+                    format: int32
+                message:
+                    type: string
+                    description: A developer-facing error message, which should be in English. Any user-facing error message should be localized and sent in the [google.rpc.Status.details][google.rpc.Status.details] field, or localized by the client.
+                details:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/GoogleProtobufAny'
+                    description: A list of messages that carry the error details.  There is a common set of message types for APIs to use.
+            description: 'The `Status` type defines a logical error model that is suitable for different programming environments, including REST APIs and RPC APIs. It is used by [gRPC](https://github.com/grpc). Each `Status` message contains three pieces of data: error code, error message, and error details. You can find out more about this error model and how to work with it in the [API Design Guide](https://cloud.google.com/apis/design/errors).'
+        ValidationProblemDetails:
+            type: object
+            description: RFC 9457 problem+json returned when request validation fails.
+            properties:
+                type:
+                    type: string
+                title:
+                    type: string
+                status:
+                    type: integer
+                    format: int32
+                errors:
+                    type: object
+                    description: Map of field name (JSON) to its validation messages.
+                    additionalProperties:
+                        type: array
+                        items:
+                            type: string
+tags:
+    - name: Checkout

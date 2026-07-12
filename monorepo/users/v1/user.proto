@@ -1,0 +1,6 @@
+syntax = "proto3";
+package users.v1;
+import "buf/validate/validate.proto";
+service Users { rpc Get(GetUser) returns (User); }
+message GetUser { string id = 1 [(buf.validate.field).string.min_len = 1]; }
+message User { string id = 1; string email = 2 [(buf.validate.field).string.email = true]; }
