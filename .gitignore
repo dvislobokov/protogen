@@ -1,8 +1,8 @@
-# Binaries
+# Binaries (root-level built binary only — NOT the cmd/protogenall package)
 *.exe
 *.exe~
 /dist/
-protogenall
+/protogenall
 
 # Descriptor sets / build artifacts
 *.binpb
