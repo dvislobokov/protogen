@@ -26,6 +26,8 @@ type Config struct {
 	OpenAPI struct {
 		Title   string `yaml:"title"`
 		Version string `yaml:"version"`
+		// EnumFormat is "string" (names, default) or "number".
+		EnumFormat string `yaml:"enum_format"`
 	} `yaml:"openapi"`
 	// DescriptorSetOut, if set, writes a FileDescriptorSet there.
 	DescriptorSetOut string `yaml:"descriptor_set_out"`

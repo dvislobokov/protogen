@@ -32,6 +32,14 @@ type enumEntry struct {
 	name string
 }
 
+// Options controls how the OpenAPI document is enriched.
+type Options struct {
+	// EnumsAsStrings renders enum-typed fields as `type: string` with the enum
+	// value names — matching how grpc-gateway's protojson marshaler serializes
+	// enums. When false, they stay numeric with an x-enum-varnames hint.
+	EnumsAsStrings bool
+}
+
 // fieldRule is the subset of constraints we surface into OpenAPI.
 type fieldRule struct {
 	required                   bool
@@ -41,15 +49,15 @@ type fieldRule struct {
 	format                     *string
 	minimum, maximum           *string
 	exclusiveMin, exclusiveMax bool
-	enum                       []scalarLit
-	enumVarnames               []string
+	enum                       []scalarLit // from string/numeric const/in
+	enumField                  []enumEntry // allowed values of an enum-typed field
 	minItems, maxItems         *uint64
 	uniqueItems                bool
 }
 
 // EnrichFile rewrites the OpenAPI v3 document at path, adding schema keywords
 // derived from buf.validate constraints (and enum value lists) in files.
-func EnrichFile(path string, files []*descriptorpb.FileDescriptorProto) error {
+func EnrichFile(path string, files []*descriptorpb.FileDescriptorProto, opts Options) error {
 	enums := buildEnumIndex(files)
 	index := buildIndex(files, enums)
 	if len(index) == 0 {
@@ -75,7 +83,7 @@ func EnrichFile(path string, files []*descriptorpb.FileDescriptorProto) error {
 
 	for i := 0; i+1 < len(schemas.Content); i += 2 {
 		if rules, ok := index[schemas.Content[i].Value]; ok {
-			applySchema(schemas.Content[i+1], rules)
+			applySchema(schemas.Content[i+1], rules, opts)
 		}
 	}
 
@@ -90,7 +98,7 @@ func EnrichFile(path string, files []*descriptorpb.FileDescriptorProto) error {
 	return os.WriteFile(path, out, 0o644)
 }
 
-func applySchema(schema *yaml.Node, rules map[string]fieldRule) {
+func applySchema(schema *yaml.Node, rules map[string]fieldRule, opts Options) {
 	props := mapGet(schema, "properties")
 	var required []string
 	for name, r := range rules {
@@ -143,17 +151,36 @@ func applySchema(schema *yaml.Node, rules map[string]fieldRule) {
 		if len(r.enum) > 0 {
 			setSequence(prop, "enum", r.enum)
 		}
-		if len(r.enumVarnames) > 0 {
-			lits := make([]scalarLit, len(r.enumVarnames))
-			for i, n := range r.enumVarnames {
-				lits[i] = scalarLit{n, "!!str"}
-			}
-			setSequence(prop, "x-enum-varnames", lits)
+		if len(r.enumField) > 0 {
+			applyEnumStyle(prop, r.enumField, opts)
 		}
 	}
 	if len(required) > 0 {
 		setRequired(schema, required)
 	}
+}
+
+// applyEnumStyle renders an enum-typed field either as string names (matching
+// grpc-gateway's protojson output) or as numbers with an x-enum-varnames hint.
+func applyEnumStyle(prop *yaml.Node, entries []enumEntry, opts Options) {
+	if opts.EnumsAsStrings {
+		names := make([]scalarLit, len(entries))
+		for i, e := range entries {
+			names[i] = scalarLit{e.name, "!!str"}
+		}
+		setScalar(prop, "type", "string", "!!str") // override gnostic's integer
+		removeKey(prop, "format")                   // "format: enum" no longer applies
+		setSequence(prop, "enum", names)
+		return
+	}
+	nums := make([]scalarLit, len(entries))
+	varnames := make([]scalarLit, len(entries))
+	for i, e := range entries {
+		nums[i] = scalarLit{strconv.FormatInt(int64(e.num), 10), "!!int"}
+		varnames[i] = scalarLit{e.name, "!!str"}
+	}
+	setSequence(prop, "enum", nums)
+	setSequence(prop, "x-enum-varnames", varnames)
 }
 
 // ---- descriptor -> constraint index ----
@@ -374,10 +401,7 @@ func applyEnumField(r *fieldRule, field *descriptorpb.FieldDescriptorProto, fr *
 			allowed = filterEnum(all, notIn, false)
 		}
 	}
-	for _, e := range allowed {
-		r.enum = append(r.enum, scalarLit{strconv.FormatInt(int64(e.num), 10), "!!int"})
-		r.enumVarnames = append(r.enumVarnames, e.name)
-	}
+	r.enumField = append(r.enumField, allowed...)
 	return len(allowed) > 0
 }
 

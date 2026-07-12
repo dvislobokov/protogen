@@ -24,7 +24,7 @@
 - 🔌 **gRPC** (`*_grpc.pb.go`) — unary **+ server / client / bidi streaming**.
 - 🌐 **gRPC-gateway** (`*.pb.gw.go`) — REST↔gRPC reverse proxy, unary + server-streaming.
 - 📖 **OpenAPI v3** (`openapi.yaml`), honoring `google.api.http`.
-- ✅ **Validation** with [protovalidate](https://github.com/bufbuild/protovalidate) — enforced at runtime **and reflected into the OpenAPI schema** (`minLength`, `pattern`, `format`, `enum` + `x-enum-varnames`, `readOnly`/`writeOnly`, `required`, …).
+- ✅ **Validation** with [protovalidate](https://github.com/bufbuild/protovalidate) — enforced at runtime **and reflected into the OpenAPI schema** (`minLength`, `pattern`, `format`, string `enum`, `readOnly`/`writeOnly`, `required`, …).
 - 🩹 **ASP.NET Core-style 400** — validation failures become RFC 9457 `problem+json` with a field→messages map (and it's documented in OpenAPI too).
 - 📦 **Bundled well-known imports** — `google/api/*` (incl. `field_behavior`) and `buf/validate/*` are embedded; no vendoring, no `--proto_path` for them.
 - 🗂️ **Managed mode** — synthesizes `go_package`/`package` when your protos omit them.
@@ -116,11 +116,15 @@ message PlaceOrderRequest {
 
 ```yaml
 customerEmail: { type: string, format: email }
-currency:      { type: integer, enum: [1, 2, 3], x-enum-varnames: [USD, EUR, GBP] }
+currency:      { type: string, enum: [USD, EUR, GBP] }   # string names, as protojson serializes them
 items:         { type: array, minItems: 1, maxItems: 50 }
 orderId:       { type: string, readOnly: true }
 required: [customerEmail, ...]
 ```
+
+> Enums render as **string names** by default (matching grpc-gateway's JSON). Pass
+> `--openapi-enum-format=number` (or `openapi.enum_format: number`) to get numeric
+> `enum` values with an `x-enum-varnames` hint instead.
 
 ## 🌊 Streaming
 
@@ -207,7 +211,7 @@ Apache 2.0 — see [LICENSE](LICENSE). Bundles Apache-licensed protos (`google/a
 - 🔌 **gRPC** (`*_grpc.pb.go`) — unary **+ server / client / bidi стриминг**.
 - 🌐 **gRPC-gateway** (`*.pb.gw.go`) — REST↔gRPC прокси, unary + server-streaming.
 - 📖 **OpenAPI v3** (`openapi.yaml`) с учётом `google.api.http`.
-- ✅ **Валидация** через [protovalidate](https://github.com/bufbuild/protovalidate) — проверка в рантайме **и отражение в OpenAPI-схему** (`minLength`, `pattern`, `format`, `enum` + `x-enum-varnames`, `readOnly`/`writeOnly`, `required`, …).
+- ✅ **Валидация** через [protovalidate](https://github.com/bufbuild/protovalidate) — проверка в рантайме **и отражение в OpenAPI-схему** (`minLength`, `pattern`, `format`, строковый `enum`, `readOnly`/`writeOnly`, `required`, …).
 - 🩹 **Ошибки в стиле ASP.NET Core** — невалидный запрос превращается в RFC 9457 `problem+json` с картой поле→сообщения (и это описано в OpenAPI).
 - 📦 **Встроенные well-known импорты** — `google/api/*` (в т.ч. `field_behavior`) и `buf/validate/*` вшиты; ни вендоринга, ни `--proto_path` для них.
 - 🗂️ **Managed mode** — подставляет `go_package`/`package`, если их нет в proto.
@@ -277,7 +281,7 @@ generators: [messages, grpc, gateway, openapiv3]   # можно подмноже
 
 ### ✅ Валидация → OpenAPI
 
-Пишешь констрейнты [protovalidate](https://github.com/bufbuild/protovalidate) в proto — и они появляются в `openapi.yaml` (отдельный валидатор не генерируется, protovalidate проверяет в рантайме): форматы (`email`/`uuid`), `pattern`, диапазоны, `enum` + `x-enum-varnames`, `readOnly`/`writeOnly` (из `field_behavior`), `required`.
+Пишешь констрейнты [protovalidate](https://github.com/bufbuild/protovalidate) в proto — и они появляются в `openapi.yaml` (отдельный валидатор не генерируется, protovalidate проверяет в рантайме): форматы (`email`/`uuid`), `pattern`, диапазоны, строковый `enum` (имена значений, как их сериализует grpc-gateway; `--openapi-enum-format=number` вернёт числа), `readOnly`/`writeOnly` (из `field_behavior`), `required`.
 
 ### 🌊 Стриминг
 

@@ -86,8 +86,8 @@ components:
         PlaceOrderRequest:
             required:
                 - paymentToken
-                - shippingAddress
                 - customerEmail
+                - shippingAddress
             type: object
             properties:
                 customerEmail:
@@ -108,14 +108,9 @@ components:
                     description: regex pattern
                     pattern: ^[A-Za-z0-9 ]{0,64}$
                 currency:
-                    type: integer
+                    type: string
                     description: 'enum: must be a defined value and not the zero/unspecified one'
-                    format: enum
                     enum:
-                        - 1
-                        - 2
-                        - 3
-                    x-enum-varnames:
                         - USD
                         - EUR
                         - GBP
@@ -137,14 +132,9 @@ components:
                     description: proto3 optional — present-or-absent, and NOT required
                     maxLength: 20
                 shippingSpeed:
-                    type: integer
+                    type: string
                     description: enum, defined values only
-                    format: enum
                     enum:
-                        - 0
-                        - 1
-                        - 2
-                    x-enum-varnames:
                         - SHIPPING_SPEED_UNSPECIFIED
                         - STANDARD
                         - EXPRESS
@@ -173,14 +163,8 @@ components:
                     type: string
                     description: 'field_behavior: server-assigned, read-only in the API surface'
                 currency:
-                    type: integer
-                    format: enum
+                    type: string
                     enum:
-                        - 0
-                        - 1
-                        - 2
-                        - 3
-                    x-enum-varnames:
                         - CURRENCY_UNSPECIFIED
                         - USD
                         - EUR

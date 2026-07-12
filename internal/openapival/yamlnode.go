@@ -72,6 +72,19 @@ func setRequired(schema *yaml.Node, names []string) {
 	}
 }
 
+// removeKey deletes key (and its value) from a mapping node, if present.
+func removeKey(m *yaml.Node, key string) {
+	if m == nil || m.Kind != yaml.MappingNode {
+		return
+	}
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value == key {
+			m.Content = append(m.Content[:i], m.Content[i+2:]...)
+			return
+		}
+	}
+}
+
 // setSequence sets or replaces key on a mapping node with a scalar sequence.
 func setSequence(m *yaml.Node, key string, items []scalarLit) {
 	if m == nil || m.Kind != yaml.MappingNode {

@@ -87,7 +87,7 @@ func TestInvalidRequestReturnsProblemJSON(t *testing.T) {
 
 func TestValidRequestSucceeds(t *testing.T) {
 	ts := newGateway(t)
-	body := `{"customerEmail":"ada@example.com","customerName":"Ada","currency":1,
+	body := `{"customerEmail":"ada@example.com","customerName":"Ada","currency":"USD",
 	          "idempotencyKey":"3f8b1c2e-1a2b-4c3d-9e8f-1234567890ab",
 	          "items":[{"sku":"ABC-1","quantity":2,"unitPrice":9.99}],"acceptTerms":true,
 	          "shippingAddress":{"line1":"1 Main St","city":"London","country":"GB","postalCode":"EC1A"}}`

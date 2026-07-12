@@ -77,7 +77,7 @@ func main() {
 	  "customerEmail": "ada@example.com",
 	  "customerName": "Ada Lovelace",
 	  "idempotencyKey": "3f8b1c2e-1a2b-4c3d-9e8f-1234567890ab",
-	  "currency": 1,
+	  "currency": "USD",
 	  "items": [{"sku": "ABC-1", "quantity": 2, "unitPrice": 9.99}],
 	  "discountPercent": 10,
 	  "acceptTerms": true,
