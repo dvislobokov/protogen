@@ -26,10 +26,10 @@
 - 🧱 **Messages** (`*.pb.go`) via the very same generator `protoc-gen-go` uses.
 - 🔌 **gRPC** (`*_grpc.pb.go`) — unary **+ server / client / bidi streaming**.
 - 🌐 **gRPC-gateway** (`*.pb.gw.go`) — REST↔gRPC reverse proxy, unary + server-streaming.
-- 📖 **OpenAPI v3** (`openapi.yaml`), honoring `google.api.http`.
+- 📖 **OpenAPI v3** (`openapi.yaml`), honoring `google.api.http` **and `openapi.v3.*` annotations** (document info, operation summary/tags, schema/property overrides).
 - ✅ **Validation** with [protovalidate](https://github.com/bufbuild/protovalidate) — enforced at runtime **and reflected into the OpenAPI schema** (`minLength`, `pattern`, `format`, string `enum`, `readOnly`/`writeOnly`, `required`, …).
 - 🩹 **ASP.NET Core-style 400** — validation failures become RFC 9457 `problem+json` with a field→messages map (and it's documented in OpenAPI too).
-- 📦 **Bundled well-known imports** — `google/api/*` (incl. `field_behavior`) and `buf/validate/*` are embedded; no vendoring, no `--proto_path` for them.
+- 📦 **Bundled well-known imports** — `google/api/*` (incl. `field_behavior`), `buf/validate/*` and `openapiv3/*` are embedded; no vendoring, no `--proto_path` for them.
 - 🗂️ **Managed mode** — synthesizes `go_package`/`package` when your protos omit them.
 - 🌳 **Monorepo-friendly** — point it at a directory (or glob) and it generates the whole tree at once.
 - ⚙️ **Config file** — commit a `protogenall.yaml` instead of a wall of flags.
@@ -44,7 +44,7 @@
 |-------|-----|
 | Parse `.proto` | `bufbuild/protocompile` (pure-Go compiler) |
 | Well-known types | `protocompile.WithStandardImports` (embedded) |
-| Bundled imports | `google/api/*` + `buf/validate/*` are `go:embed`-ed and served by a composite resolver (`--list-builtins`) |
+| Bundled imports | `google/api/*` + `buf/validate/*` + `openapiv3/*` are `go:embed`-ed and served by a composite resolver (`--list-builtins`) |
 | Managed metadata | inject `go_package` / `package` from flags |
 | Messages | `protoc-gen-go/internal_gengo` — importable (the path element is `internal_gengo`, not `internal`) |
 | gRPC | compact `protogen` generator, modeled on protoc-gen-go-grpc's generics output |
@@ -79,7 +79,7 @@ protogenall \
 # → gen/greeter.pb.go  gen/greeter_grpc.pb.go  gen/greeter.pb.gw.go  gen/openapi.yaml
 ```
 
-`google/api/*` and `buf/validate/*` are bundled in the binary, so you point `--proto_path` only at **your** protos.
+`google/api/*`, `buf/validate/*` and `openapiv3/*` are bundled in the binary, so you point `--proto_path` only at **your** protos.
 
 ### 🌳 Whole monorepo at once
 
@@ -128,6 +128,35 @@ required: [customerEmail, ...]
 > Enums render as **string names** by default (matching grpc-gateway's JSON). Pass
 > `--openapi-enum-format=number` (or `openapi.enum_format: number`) to get numeric
 > `enum` values with an `x-enum-varnames` hint instead.
+
+## 📝 OpenAPI annotations
+
+Import `openapiv3/annotations.proto` (bundled — nothing to vendor) to customize the OpenAPI output right from the proto: document info, per-operation summary/description/tags, and schema/property overrides. These are [gnostic's `openapi.v3` options](https://github.com/google/gnostic/blob/main/openapiv3/annotations.proto), read natively by the OpenAPI generator:
+
+```proto
+import "openapiv3/annotations.proto";
+
+option (openapi.v3.document) = {
+  info: { title: "Pet Store API", version: "1.2.3", description: "..." }
+};
+
+service PetService {
+  rpc GetPet(GetPetRequest) returns (Pet) {
+    option (google.api.http) = { get: "/v1/pets/{id}" };
+    option (openapi.v3.operation) = {
+      summary: "Fetch a pet"
+      tags: ["pets"]
+    };
+  }
+}
+
+message Pet {
+  option (openapi.v3.schema) = { description: "A pet in the store." };
+  string name = 1 [(openapi.v3.property) = { max_length: 64 }];
+}
+```
+
+`(openapi.v3.document).info` takes precedence over `--openapi-title`/`--openapi-version`.
 
 ## 🌊 Streaming
 
@@ -193,7 +222,7 @@ New generators just implement the `gen.Generator` interface (`internal/gen/regis
 
 ## 📄 License
 
-Apache 2.0 — see [LICENSE](LICENSE). Bundles Apache-licensed protos (`google/api`, `buf/validate`) and vendors `grpc-gateway`'s `httprule` package.
+Apache 2.0 — see [LICENSE](LICENSE). Bundles Apache-licensed protos (`google/api`, `buf/validate`, gnostic's `openapiv3`) and vendors `grpc-gateway`'s `httprule` package.
 
 ---
 
@@ -213,10 +242,10 @@ Apache 2.0 — see [LICENSE](LICENSE). Bundles Apache-licensed protos (`google/a
 - 🧱 **Сообщения** (`*.pb.go`) — тем же генератором, что и `protoc-gen-go`.
 - 🔌 **gRPC** (`*_grpc.pb.go`) — unary **+ server / client / bidi стриминг**.
 - 🌐 **gRPC-gateway** (`*.pb.gw.go`) — REST↔gRPC прокси, unary + server-streaming.
-- 📖 **OpenAPI v3** (`openapi.yaml`) с учётом `google.api.http`.
+- 📖 **OpenAPI v3** (`openapi.yaml`) с учётом `google.api.http` **и аннотаций `openapi.v3.*`** (info документа, summary/tags операций, переопределения схем и полей).
 - ✅ **Валидация** через [protovalidate](https://github.com/bufbuild/protovalidate) — проверка в рантайме **и отражение в OpenAPI-схему** (`minLength`, `pattern`, `format`, строковый `enum`, `readOnly`/`writeOnly`, `required`, …).
 - 🩹 **Ошибки в стиле ASP.NET Core** — невалидный запрос превращается в RFC 9457 `problem+json` с картой поле→сообщения (и это описано в OpenAPI).
-- 📦 **Встроенные well-known импорты** — `google/api/*` (в т.ч. `field_behavior`) и `buf/validate/*` вшиты; ни вендоринга, ни `--proto_path` для них.
+- 📦 **Встроенные well-known импорты** — `google/api/*` (в т.ч. `field_behavior`), `buf/validate/*` и `openapiv3/*` вшиты; ни вендоринга, ни `--proto_path` для них.
 - 🗂️ **Managed mode** — подставляет `go_package`/`package`, если их нет в proto.
 - 🌳 **Дружит с монорепой** — укажи папку (или glob), и всё дерево сгенерируется за раз.
 - ⚙️ **Конфиг-файл** — вместо простыни флагов коммить `protogenall.yaml`.
@@ -231,7 +260,7 @@ Apache 2.0 — see [LICENSE](LICENSE). Bundles Apache-licensed protos (`google/a
 |------|-----|
 | Парсинг `.proto` | `bufbuild/protocompile` (компилятор на чистом Go) |
 | Well-known типы | `protocompile.WithStandardImports` (встроены) |
-| Встроенные импорты | `google/api/*` + `buf/validate/*` через `go:embed` и композитный резолвер (`--list-builtins`) |
+| Встроенные импорты | `google/api/*` + `buf/validate/*` + `openapiv3/*` через `go:embed` и композитный резолвер (`--list-builtins`) |
 | Метаданные | подстановка `go_package` / `package` из флагов |
 | Сообщения | `protoc-gen-go/internal_gengo` — импортируется (элемент пути — `internal_gengo`, не `internal`) |
 | gRPC | компактный `protogen`-генератор по образцу generics-вывода protoc-gen-go-grpc |
@@ -259,7 +288,7 @@ protogenall \
   greeter.proto
 ```
 
-`google/api/*` и `buf/validate/*` вшиты в бинарник, поэтому `--proto_path` указывает только на **твои** proto.
+`google/api/*`, `buf/validate/*` и `openapiv3/*` вшиты в бинарник, поэтому `--proto_path` указывает только на **твои** proto.
 
 ### 🌳 Вся монорепа за раз
 
@@ -285,6 +314,10 @@ generators: [messages, grpc, gateway, openapiv3]   # можно подмноже
 ### ✅ Валидация → OpenAPI
 
 Пишешь констрейнты [protovalidate](https://github.com/bufbuild/protovalidate) в proto — и они появляются в `openapi.yaml` (отдельный валидатор не генерируется, protovalidate проверяет в рантайме): форматы (`email`/`uuid`), `pattern`, диапазоны, строковый `enum` (имена значений, как их сериализует grpc-gateway; `--openapi-enum-format=number` вернёт числа), `readOnly`/`writeOnly` (из `field_behavior`), `required`.
+
+### 📝 OpenAPI-аннотации
+
+Импортируй `openapiv3/annotations.proto` (вшит в бинарник) и настраивай OpenAPI прямо из proto: `(openapi.v3.document)` — info документа, `(openapi.v3.operation)` — summary/description/tags операции, `(openapi.v3.schema)` и `(openapi.v3.property)` — переопределения схем и полей. Это [опции `openapi.v3` из gnostic](https://github.com/google/gnostic/blob/main/openapiv3/annotations.proto); `(openapi.v3.document).info` имеет приоритет над `--openapi-title`/`--openapi-version`.
 
 ### 🌊 Стриминг
 

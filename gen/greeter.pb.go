@@ -11,6 +11,7 @@ package greeter
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	_ "github.com/google/gnostic/openapiv3"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -172,7 +173,7 @@ var File_greeter_proto protoreflect.FileDescriptor
 const file_greeter_proto_rawDesc = "" +
 	"\n" +
 	"\rgreeter.proto\x12\n" +
-	"greeter.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1bbuf/validate/validate.proto\"N\n" +
+	"greeter.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1bbuf/validate/validate.proto\x1a\x1bopenapiv3/annotations.proto\"N\n" +
 	"\fHelloRequest\x12\x1d\n" +
 	"\x04name\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18(R\x04name\x12\x1f\n" +
 	"\x05times\x18\x02 \x01(\x05B\t\xbaH\x06\x1a\x04\x18\n" +
@@ -181,9 +182,10 @@ const file_greeter_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x04name\"&\n" +
 	"\n" +
 	"HelloReply\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage2\xc8\x01\n" +
-	"\aGreeter\x12Z\n" +
-	"\bSayHello\x12\x18.greeter.v1.HelloRequest\x1a\x16.greeter.v1.HelloReply\"\x1c\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/v1/greeter/hello\x12a\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage2\xe7\x01\n" +
+	"\aGreeter\x12y\n" +
+	"\bSayHello\x12\x18.greeter.v1.HelloRequest\x1a\x16.greeter.v1.HelloReply\";\xbaG\x1c\n" +
+	"\tgreetings\x12\x0fSend a greeting\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/v1/greeter/hello\x12a\n" +
 	"\vGetGreeting\x12\x1e.greeter.v1.GetGreetingRequest\x1a\x16.greeter.v1.HelloReply\"\x1a\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/greeter/{name}B-Z+github.com/dvislobokov/protogen/gen;greeterb\x06proto3"
 
 var (

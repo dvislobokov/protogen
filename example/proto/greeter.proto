@@ -6,6 +6,7 @@ package greeter.v1;
 
 import "google/api/annotations.proto";
 import "buf/validate/validate.proto";
+import "openapiv3/annotations.proto";
 
 service Greeter {
   // Unary RPC with a REST/HTTP mapping consumed by the gateway + OpenAPI.
@@ -13,6 +14,11 @@ service Greeter {
     option (google.api.http) = {
       post: "/v1/greeter/hello"
       body: "*"
+    };
+    // openapi.v3 annotations customize the OpenAPI output for this operation.
+    option (openapi.v3.operation) = {
+      summary: "Send a greeting"
+      tags: ["greetings"]
     };
   }
 

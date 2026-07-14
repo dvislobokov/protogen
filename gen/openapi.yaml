@@ -10,6 +10,8 @@ paths:
         post:
             tags:
                 - Greeter
+                - greetings
+            summary: Send a greeting
             description: Unary RPC with a REST/HTTP mapping consumed by the gateway + OpenAPI.
             operationId: Greeter_SayHello
             requestBody:

@@ -19,7 +19,8 @@ import (
 )
 
 // builtinFS holds the commonly-imported annotation protos (google.api.http,
-// buf.validate) so users never have to vendor or pass them on --proto_path.
+// buf.validate, openapi.v3) so users never have to vendor or pass them on
+// --proto_path.
 //
 //go:embed builtin
 var builtinFS embed.FS
