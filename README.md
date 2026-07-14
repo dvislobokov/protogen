@@ -6,6 +6,9 @@
 
 Единый Go-бинарник, который превращает `.proto` в Go-сообщения, gRPC, gRPC-gateway и OpenAPI v3 — **без `protoc` и без внешних плагинов**.
 
+[![CI](https://github.com/dvislobokov/protogen/actions/workflows/ci.yml/badge.svg)](https://github.com/dvislobokov/protogen/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/dvislobokov/protogen.svg)](https://pkg.go.dev/github.com/dvislobokov/protogen)
+[![Go Report Card](https://goreportcard.com/badge/github.com/dvislobokov/protogen)](https://goreportcard.com/report/github.com/dvislobokov/protogen)
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![protoc](https://img.shields.io/badge/protoc-not_required-success)](#-why-it-works-without-protoc)

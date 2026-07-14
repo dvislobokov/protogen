@@ -169,7 +169,7 @@ func applyEnumStyle(prop *yaml.Node, entries []enumEntry, opts Options) {
 			names[i] = scalarLit{e.name, "!!str"}
 		}
 		setScalar(prop, "type", "string", "!!str") // override gnostic's integer
-		removeKey(prop, "format")                   // "format: enum" no longer applies
+		removeKey(prop, "format")                  // "format: enum" no longer applies
 		setSequence(prop, "enum", names)
 		return
 	}
@@ -464,8 +464,8 @@ func trimDot(s string) string {
 	return s
 }
 
-func i(v int64) string   { return strconv.FormatInt(v, 10) }
-func u(v uint64) string  { return strconv.FormatUint(v, 10) }
+func i(v int64) string  { return strconv.FormatInt(v, 10) }
+func u(v uint64) string { return strconv.FormatUint(v, 10) }
 func fl(v float64) string {
 	return strconv.FormatFloat(v, 'g', -1, 64)
 }

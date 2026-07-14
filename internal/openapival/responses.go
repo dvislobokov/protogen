@@ -88,8 +88,8 @@ func addValidationResponses(root *yaml.Node, files []*descriptorpb.FileDescripto
 // analyzeOperations maps operationId -> whether its request message is validated
 // (directly, or transitively through message-typed fields).
 func analyzeOperations(files []*descriptorpb.FileDescriptorProto) map[string]bool {
-	direct := map[string]bool{}          // full message name -> has a constraint
-	edges := map[string][]string{}       // full message name -> message-typed field targets
+	direct := map[string]bool{}    // full message name -> has a constraint
+	edges := map[string][]string{} // full message name -> message-typed field targets
 	var walk func(prefix string, m *descriptorpb.DescriptorProto)
 	walk = func(prefix string, m *descriptorpb.DescriptorProto) {
 		full := prefix + m.GetName()
