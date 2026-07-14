@@ -46,6 +46,15 @@ type settings struct {
 }
 
 func main() {
+	// Subcommand form: `protogenall init [dir]` scaffolds a project.
+	if len(os.Args) > 1 && os.Args[1] == "init" {
+		if err := runInit(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	var importPaths stringList
 	flag.Var(&importPaths, "proto_path", "import path root (repeatable), like protoc -I")
 
@@ -79,9 +88,26 @@ func main() {
 	set := map[string]bool{}
 	flag.Visit(func(f *flag.Flag) { set[f.Name] = true })
 
+	inputs := flag.Args()
+	// `protogenall <dir>` where dir is a project root (holds protogenall.yaml,
+	// e.g. created by `protogenall init <dir>`): generate that project as if
+	// run from inside it.
+	if *configPath == "" && len(inputs) == 1 {
+		if st, err := os.Stat(inputs[0]); err == nil && st.IsDir() {
+			if _, err := os.Stat(filepath.Join(inputs[0], "protogenall.yaml")); err == nil {
+				if err := os.Chdir(inputs[0]); err != nil {
+					fmt.Fprintln(os.Stderr, "error:", err)
+					os.Exit(1)
+				}
+				fmt.Println("project directory:", inputs[0])
+				inputs = nil
+			}
+		}
+	}
+
 	s := settings{
 		importPaths:      importPaths,
-		inputs:           flag.Args(),
+		inputs:           inputs,
 		out:              *out,
 		goPkgPrefix:      *goPkgPrefix,
 		protoPkg:         *protoPkg,
@@ -107,6 +133,8 @@ func main() {
 	}
 	if len(s.inputs) == 0 {
 		fmt.Fprintln(os.Stderr, "usage: protogenall [flags] <proto files | directories | globs>")
+		fmt.Fprintln(os.Stderr, "       protogenall <project dir>   # a dir holding protogenall.yaml")
+		fmt.Fprintln(os.Stderr, "       protogenall init [dir]      # scaffold a new project")
 		fmt.Fprintln(os.Stderr, "  e.g. protogenall --proto_path=proto --out=gen proto   # whole tree")
 		fmt.Fprintln(os.Stderr, "  or provide inputs via protogenall.yaml (--config)")
 		flag.PrintDefaults()

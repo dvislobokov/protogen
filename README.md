@@ -36,6 +36,7 @@
 - ⚙️ **Config file** — commit a `protogenall.yaml` instead of a wall of flags.
 - 🔭 **Reflection + health** — `grpcx.Register(s)` adds server reflection and the health service.
 - 🧰 **`go install`-able**, with `--version`.
+- 🚀 **`protogenall init`** — scaffolds a starter proto (with all the annotations wired up) and a config; then a bare `protogenall` (or `protogenall <dir>`) generates everything.
 
 ## 🎯 Why it works without `protoc`
 
@@ -69,6 +70,18 @@ go run ./cmd/protogenall --help
 ```
 
 ## 🚀 Quick start
+
+Scaffold a project and generate — two commands, zero flags:
+
+```sh
+protogenall init myapi     # creates myapi/proto/…/myapi.proto + myapi/protogenall.yaml
+protogenall myapi          # or: cd myapi && protogenall
+# → myapi/gen/…  (*.pb.go, *_grpc.pb.go, *.pb.gw.go, openapi.yaml)
+```
+
+`init` writes a starter proto that already demonstrates `google.api.http`, `buf.validate`, `openapi.v3` and `protogen.authz` annotations, plus a `protogenall.yaml`; run it inside a Go module and `go_package_prefix` is derived from your `go.mod`. Existing files are never overwritten (use `--force`).
+
+Or drive everything with flags:
 
 ```sh
 protogenall \
@@ -294,6 +307,7 @@ Apache 2.0 — see [LICENSE](LICENSE). Bundles Apache-licensed protos (`google/a
 - ⚙️ **Конфиг-файл** — вместо простыни флагов коммить `protogenall.yaml`.
 - 🔭 **Reflection + health** — `grpcx.Register(s)` добавляет server reflection и health-сервис.
 - 🧰 **Ставится через `go install`**, есть `--version`.
+- 🚀 **`protogenall init`** — скаффолдит стартовый proto (со всеми аннотациями) и конфиг; дальше достаточно `protogenall` без аргументов (или `protogenall <папка>`).
 
 ### 🎯 Почему это работает без `protoc`
 
@@ -321,6 +335,18 @@ protogenall --version
 ```
 
 ### 🚀 Быстрый старт
+
+Скаффолдинг и генерация — две команды без флагов:
+
+```sh
+protogenall init myapi     # создаст myapi/proto/…/myapi.proto + myapi/protogenall.yaml
+protogenall myapi          # или: cd myapi && protogenall
+# → myapi/gen/…  (*.pb.go, *_grpc.pb.go, *.pb.gw.go, openapi.yaml)
+```
+
+`init` кладёт стартовый proto с уже подключёнными аннотациями (`google.api.http`, `buf.validate`, `openapi.v3`, `protogen.authz`) и `protogenall.yaml`; внутри Go-модуля `go_package_prefix` берётся из `go.mod`. Существующие файлы не перезаписываются (есть `--force`).
+
+Или всё то же флагами:
 
 ```sh
 protogenall \
