@@ -1,0 +1,64 @@
+// protogen.authz declares per-method access requirements (roles/permissions)
+// as proto options. They are enforced at runtime by the interceptors in
+// github.com/dvislobokov/protogen/authz — the annotation alone does nothing.
+//
+// Usage:
+//
+//   import "protogen/authz/authz.proto";
+//
+//   service Orders {
+//     // Service-wide default for methods without their own annotation.
+//     option (protogen.authz.default_requires) = { public: true };
+//
+//     rpc Cancel(CancelRequest) returns (CancelReply) {
+//       option (protogen.authz.requires) = {
+//         roles: { any_of: ["admin", "support"] }
+//         permissions: { all_of: ["orders.write"] }
+//       };
+//     }
+//   }
+syntax = "proto3";
+
+package protogen.authz;
+
+import "google/protobuf/descriptor.proto";
+
+option go_package = "github.com/dvislobokov/protogen/authz;authz";
+
+// Rule matches a subject's attribute list (roles or permissions).
+// Every set field must pass; an empty rule always passes.
+message Rule {
+  // The subject must have at least one of these values ("oneOf").
+  repeated string any_of = 1;
+  // The subject must have every one of these values ("all").
+  repeated string all_of = 2;
+  // The subject must have none of these values.
+  repeated string none_of = 3;
+}
+
+// Requirements declares who may call a method.
+//
+// An empty Requirements ({}) means "any authenticated subject". A method
+// without any annotation (and no service default) is not checked at all.
+message Requirements {
+  // Roles the calling subject must satisfy.
+  Rule roles = 1;
+  // Permissions the calling subject must satisfy.
+  Rule permissions = 2;
+  // Public methods skip authentication and all checks.
+  bool public = 3;
+}
+
+// Field numbers are from the 50000–99999 range reserved by protobuf for
+// organization-internal use; they only need to be unique among the extensions
+// linked into one binary.
+extend google.protobuf.MethodOptions {
+  // Access requirements for this method.
+  Requirements requires = 58000;
+}
+
+extend google.protobuf.ServiceOptions {
+  // Default requirements for every method of the service that does not carry
+  // its own (protogen.authz.requires) option.
+  Requirements default_requires = 58000;
+}

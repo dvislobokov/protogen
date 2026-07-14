@@ -16,6 +16,10 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
+
+	// Registers the protogen.authz extension types so normalizeExtensions
+	// decodes (protogen.authz.requires) into concrete values.
+	_ "github.com/dvislobokov/protogen/authz"
 )
 
 // builtinFS holds the commonly-imported annotation protos (google.api.http,

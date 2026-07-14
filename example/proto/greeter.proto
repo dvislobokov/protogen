@@ -7,8 +7,12 @@ package greeter.v1;
 import "google/api/annotations.proto";
 import "buf/validate/validate.proto";
 import "openapiv3/annotations.proto";
+import "protogen/authz/authz.proto";
 
 service Greeter {
+  // Methods without their own (protogen.authz.requires) stay public.
+  option (protogen.authz.default_requires) = { public: true };
+
   // Unary RPC with a REST/HTTP mapping consumed by the gateway + OpenAPI.
   rpc SayHello(HelloRequest) returns (HelloReply) {
     option (google.api.http) = {
@@ -19,6 +23,11 @@ service Greeter {
     option (openapi.v3.operation) = {
       summary: "Send a greeting"
       tags: ["greetings"]
+    };
+    // Enforced by authz.UnaryServerInterceptor — see the authz package.
+    option (protogen.authz.requires) = {
+      roles: { any_of: ["admin", "greeter"] }
+      permissions: { all_of: ["greetings.write"] }
     };
   }
 

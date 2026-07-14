@@ -29,7 +29,8 @@
 - 📖 **OpenAPI v3** (`openapi.yaml`), honoring `google.api.http` **and `openapi.v3.*` annotations** (document info, operation summary/tags, schema/property overrides).
 - ✅ **Validation** with [protovalidate](https://github.com/bufbuild/protovalidate) — enforced at runtime **and reflected into the OpenAPI schema** (`minLength`, `pattern`, `format`, string `enum`, `readOnly`/`writeOnly`, `required`, …).
 - 🩹 **ASP.NET Core-style 400** — validation failures become RFC 9457 `problem+json` with a field→messages map (and it's documented in OpenAPI too).
-- 📦 **Bundled well-known imports** — `google/api/*` (incl. `field_behavior`), `buf/validate/*` and `openapiv3/*` are embedded; no vendoring, no `--proto_path` for them.
+- 🔐 **Roles & permissions per method** — annotate RPCs with `(protogen.authz.requires)` (`any_of`/`all_of`/`none_of`) and enforce them with the bundled gRPC interceptors.
+- 📦 **Bundled well-known imports** — `google/api/*` (incl. `field_behavior`), `buf/validate/*`, `openapiv3/*` and `protogen/authz/*` are embedded; no vendoring, no `--proto_path` for them.
 - 🗂️ **Managed mode** — synthesizes `go_package`/`package` when your protos omit them.
 - 🌳 **Monorepo-friendly** — point it at a directory (or glob) and it generates the whole tree at once.
 - ⚙️ **Config file** — commit a `protogenall.yaml` instead of a wall of flags.
@@ -158,6 +159,47 @@ message Pet {
 
 `(openapi.v3.document).info` takes precedence over `--openapi-title`/`--openapi-version`.
 
+## 🔐 Roles & permissions per method
+
+Annotate methods with `(protogen.authz.requires)` (the proto is bundled) and enforce it with the interceptors from `github.com/dvislobokov/protogen/authz`:
+
+```proto
+import "protogen/authz/authz.proto";
+
+service Greeter {
+  // Default for methods without their own annotation.
+  option (protogen.authz.default_requires) = { public: true };
+
+  rpc SayHello(HelloRequest) returns (HelloReply) {
+    option (protogen.authz.requires) = {
+      roles: { any_of: ["admin", "greeter"] }        // "oneOf" semantics
+      permissions: { all_of: ["greetings.write"] }   // "all" semantics
+    };
+  }
+}
+```
+
+Rules support `any_of` (at least one), `all_of` (every one) and `none_of` (deny-list); all set fields must pass. `{}` means "any authenticated subject", `{ public: true }` skips checks entirely, and unannotated methods (with no service default) are not checked.
+
+Enforcement is one interceptor pair — you supply the `SubjectFunc` that extracts roles/permissions from the request (e.g. from a JWT):
+
+```go
+subject := func(ctx context.Context) (*authz.Subject, error) {
+    claims, err := verifyJWT(ctx) // your auth
+    if err != nil || claims == nil {
+        return nil, err // nil subject → Unauthenticated on protected methods
+    }
+    return &authz.Subject{Roles: claims.Roles, Permissions: claims.Scopes}, nil
+}
+
+s := grpc.NewServer(
+    grpc.ChainUnaryInterceptor(authz.UnaryServerInterceptor(subject)),
+    grpc.ChainStreamInterceptor(authz.StreamServerInterceptor(subject)),
+)
+```
+
+Failures map to gRPC codes (`Unauthenticated` / `PermissionDenied`), which the gateway translates to HTTP 401/403. `authz.Authorize(ctx, fullMethod, subject)` is exported for custom transports.
+
 ## 🌊 Streaming
 
 All four RPC kinds are generated. `example/stream` exercises each end to end (bufconn), plus a gateway server-streaming HTTP round trip:
@@ -245,7 +287,8 @@ Apache 2.0 — see [LICENSE](LICENSE). Bundles Apache-licensed protos (`google/a
 - 📖 **OpenAPI v3** (`openapi.yaml`) с учётом `google.api.http` **и аннотаций `openapi.v3.*`** (info документа, summary/tags операций, переопределения схем и полей).
 - ✅ **Валидация** через [protovalidate](https://github.com/bufbuild/protovalidate) — проверка в рантайме **и отражение в OpenAPI-схему** (`minLength`, `pattern`, `format`, строковый `enum`, `readOnly`/`writeOnly`, `required`, …).
 - 🩹 **Ошибки в стиле ASP.NET Core** — невалидный запрос превращается в RFC 9457 `problem+json` с картой поле→сообщения (и это описано в OpenAPI).
-- 📦 **Встроенные well-known импорты** — `google/api/*` (в т.ч. `field_behavior`), `buf/validate/*` и `openapiv3/*` вшиты; ни вендоринга, ни `--proto_path` для них.
+- 🔐 **Роли и пермиссии на метод** — аннотация `(protogen.authz.requires)` (`any_of`/`all_of`/`none_of`) + готовые gRPC-интерцепторы для проверки.
+- 📦 **Встроенные well-known импорты** — `google/api/*` (в т.ч. `field_behavior`), `buf/validate/*`, `openapiv3/*` и `protogen/authz/*` вшиты; ни вендоринга, ни `--proto_path` для них.
 - 🗂️ **Managed mode** — подставляет `go_package`/`package`, если их нет в proto.
 - 🌳 **Дружит с монорепой** — укажи папку (или glob), и всё дерево сгенерируется за раз.
 - ⚙️ **Конфиг-файл** — вместо простыни флагов коммить `protogenall.yaml`.
@@ -318,6 +361,10 @@ generators: [messages, grpc, gateway, openapiv3]   # можно подмноже
 ### 📝 OpenAPI-аннотации
 
 Импортируй `openapiv3/annotations.proto` (вшит в бинарник) и настраивай OpenAPI прямо из proto: `(openapi.v3.document)` — info документа, `(openapi.v3.operation)` — summary/description/tags операции, `(openapi.v3.schema)` и `(openapi.v3.property)` — переопределения схем и полей. Это [опции `openapi.v3` из gnostic](https://github.com/google/gnostic/blob/main/openapiv3/annotations.proto); `(openapi.v3.document).info` имеет приоритет над `--openapi-title`/`--openapi-version`.
+
+### 🔐 Роли и пермиссии на метод
+
+Импортируй `protogen/authz/authz.proto` (вшит) и вешай на методы `(protogen.authz.requires)` с правилами `any_of` (хотя бы одна — «oneOf»), `all_of` (все — «all») и `none_of` (запрещённые); `(protogen.authz.default_requires)` на сервисе задаёт дефолт. `{}` — «любой аутентифицированный», `{ public: true }` — без проверок, метод без аннотаций не проверяется. Enforcement — интерцепторы `authz.UnaryServerInterceptor` / `authz.StreamServerInterceptor` из `github.com/dvislobokov/protogen/authz`: ты передаёшь `SubjectFunc`, достающий роли/пермиссии из контекста (например из JWT), а отказ маппится в `Unauthenticated`/`PermissionDenied` (401/403 через gateway). Пример — `example/proto/greeter.proto` и `authz/interceptor_test.go`.
 
 ### 🌊 Стриминг
 
