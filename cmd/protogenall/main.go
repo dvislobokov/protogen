@@ -327,6 +327,27 @@ func resolvedUnderImport(name string, importPaths []string) bool {
 	return false
 }
 
+// dropBuiltinTargets removes the annotation protos bundled in the binary from
+// the generation targets. `protogenall init` vendors them under third_party/
+// for IDE import resolution; if an input sweeps them in, they must still be
+// compiled as imports only, never code-generated.
+func dropBuiltinTargets(files []string) []string {
+	builtin := map[string]bool{}
+	for _, p := range compile.BuiltinImports() {
+		builtin[p] = true
+	}
+	var out []string
+	for _, f := range files {
+		if !builtin[f] {
+			out = append(out, f)
+		}
+	}
+	if dropped := len(files) - len(out); dropped > 0 {
+		fmt.Printf("skipping %d vendored builtin proto(s): compiled as imports, not generated\n", dropped)
+	}
+	return out
+}
+
 func run(s settings) error {
 	ctx := context.Background()
 
@@ -334,6 +355,7 @@ func run(s settings) error {
 	if err != nil {
 		return err
 	}
+	files = dropBuiltinTargets(files)
 	if len(files) == 0 {
 		return fmt.Errorf("no .proto files matched %v", s.inputs)
 	}

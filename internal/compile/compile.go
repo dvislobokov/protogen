@@ -51,6 +51,31 @@ func BuiltinImports() []string {
 	return out
 }
 
+// BuiltinFile is one embedded proto: its import path (e.g.
+// "google/api/annotations.proto") and its source bytes.
+type BuiltinFile struct {
+	Path string
+	Data []byte
+}
+
+// BuiltinFiles returns the embedded protos so callers can vendor them to disk
+// (`protogenall init` writes them under third_party/ for IDE import resolution).
+func BuiltinFiles() []BuiltinFile {
+	var out []BuiltinFile
+	fs.WalkDir(builtinFS, "builtin", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		data, err := builtinFS.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		out = append(out, BuiltinFile{Path: p[len("builtin/"):], Data: data})
+		return nil
+	})
+	return out
+}
+
 // Options controls how sources are located and parsed.
 type Options struct {
 	// ImportPaths are the roots used to resolve `import` statements, in order.

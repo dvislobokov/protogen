@@ -7,11 +7,15 @@ import (
 	"path/filepath"
 	"strings"
 	"unicode"
+
+	"github.com/dvislobokov/protogen/internal/compile"
 )
 
 // runInit implements `protogenall init [dir]`: it scaffolds a ready-to-generate
 // project — a starter proto (with google.api.http, buf.validate, openapi.v3 and
-// protogen.authz annotations) and a protogenall.yaml — so that a plain
+// protogen.authz annotations), a protogenall.yaml, and a third_party/ vendor of
+// the builtin annotation protos (so IDEs resolve the imports; generation itself
+// uses the embedded copies and never code-generates them) — so that a plain
 // `protogenall` (or `protogenall <dir>`) is all that's left to run.
 func runInit(args []string) error {
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
@@ -42,6 +46,15 @@ func runInit(args []string) error {
 	files := []struct{ rel, content string }{
 		{protoRel, renderTemplate(protoTemplate, name, title, module)},
 		{"protogenall.yaml", renderTemplate(configTemplate, name, title, module)},
+		{filepath.Join("third_party", "README.md"), thirdPartyReadme},
+	}
+	// Vendor the builtin annotation protos so IDE proto plugins can resolve the
+	// imports (add third_party as an import root in the IDE). The compiler uses
+	// the copies embedded in the binary and never code-generates these files.
+	for _, bf := range compile.BuiltinFiles() {
+		files = append(files, struct{ rel, content string }{
+			filepath.Join("third_party", filepath.FromSlash(bf.Path)), string(bf.Data),
+		})
 	}
 
 	fmt.Println("initializing protogen project in", dir)
@@ -198,7 +211,10 @@ message {{Name}} {
 const configTemplate = `# protogenall configuration (scaffolded by protogenall init).
 # Explicit CLI flags override these values.
 
-proto_paths: [proto]
+# third_party holds vendored copies of the annotation protos that are also
+# embedded in the protogenall binary — it exists so IDEs can resolve imports.
+# It is an import root only: those files are never code-generated.
+proto_paths: [proto, third_party]
 inputs: [proto]
 out: gen
 go_package_prefix: {{module}}/gen
@@ -215,4 +231,18 @@ go_package_prefix: {{module}}/gen
 
 # Also write a buf-style descriptor image:
 # descriptor_set_out: build/image.binpb
+`
+
+const thirdPartyReadme = `# third_party
+
+Vendored copies of the annotation protos imported by this project
+(google.api, buf.validate, openapi.v3, protogen.authz).
+
+They exist only so that IDE protobuf plugins can resolve the imports —
+point your IDE's proto import path at this directory (in addition to
+` + "`proto/`" + `). protogenall itself uses the copies embedded in its binary
+(see ` + "`protogenall --list-builtins`" + `) and never generates code for
+these files, even if they end up in its inputs.
+
+Re-running ` + "`protogenall init --force`" + ` refreshes them.
 `

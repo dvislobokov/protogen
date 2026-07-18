@@ -81,6 +81,8 @@ protogenall myapi          # or: cd myapi && protogenall
 
 `init` writes a starter proto that already demonstrates `google.api.http`, `buf.validate`, `openapi.v3` and `protogen.authz` annotations, plus a `protogenall.yaml`; run it inside a Go module and `go_package_prefix` is derived from your `go.mod`. Existing files are never overwritten (use `--force`).
 
+It also vendors the builtin annotation protos into `third_party/` so IDE protobuf plugins can resolve the imports (point the plugin's import paths at `proto/` and `third_party/`). These files are for the IDE only: the compiler uses the copies embedded in the binary, and they are never code-generated even if they end up in the inputs.
+
 Or drive everything with flags:
 
 ```sh
@@ -345,6 +347,8 @@ protogenall myapi          # или: cd myapi && protogenall
 ```
 
 `init` кладёт стартовый proto с уже подключёнными аннотациями (`google.api.http`, `buf.validate`, `openapi.v3`, `protogen.authz`) и `protogenall.yaml`; внутри Go-модуля `go_package_prefix` берётся из `go.mod`. Существующие файлы не перезаписываются (есть `--force`).
+
+Дополнительно `init` кладёт копии встроенных аннотационных proto в `third_party/`, чтобы protobuf-плагин IDE резолвил импорты и давал подсказки (укажите в плагине import paths `proto/` и `third_party/`). Эти файлы нужны только IDE: компилятор использует копии, встроенные в бинарник, и код по ним никогда не генерируется, даже если они попали во inputs.
 
 Или всё то же флагами:
 

@@ -26,6 +26,19 @@ func TestInitScaffoldAndGenerate(t *testing.T) {
 		t.Fatalf("scaffolded proto missing: %v", err)
 	}
 
+	// The builtin annotation protos must be vendored for IDE import resolution.
+	for _, f := range []string{
+		filepath.Join("third_party", "google", "api", "annotations.proto"),
+		filepath.Join("third_party", "buf", "validate", "validate.proto"),
+		filepath.Join("third_party", "openapiv3", "annotations.proto"),
+		filepath.Join("third_party", "protogen", "authz", "authz.proto"),
+		filepath.Join("third_party", "README.md"),
+	} {
+		if _, err := os.Stat(filepath.Join(dir, f)); err != nil {
+			t.Errorf("expected vendored file %s: %v", f, err)
+		}
+	}
+
 	cfg, err := config.Load(filepath.Join(dir, "protogenall.yaml"))
 	if err != nil {
 		t.Fatalf("scaffolded config does not parse: %v", err)
@@ -40,11 +53,12 @@ func TestInitScaffoldAndGenerate(t *testing.T) {
 	}
 
 	// The scaffolded project must generate end to end: messages, grpc,
-	// gateway, openapi + enrichment.
+	// gateway, openapi + enrichment. third_party is deliberately passed as an
+	// input too: the vendored builtin protos must be skipped, not generated.
 	out := filepath.Join(dir, "gen")
 	err = run(settings{
-		importPaths:    []string{filepath.Join(dir, "proto")},
-		inputs:         []string{filepath.Join(dir, "proto")},
+		importPaths:    []string{filepath.Join(dir, "proto"), filepath.Join(dir, "third_party")},
+		inputs:         []string{filepath.Join(dir, "proto"), filepath.Join(dir, "third_party")},
 		out:            out,
 		goPkgPrefix:    cfg.GoPackagePrefix,
 		oapiTitle:      "API",
@@ -63,6 +77,13 @@ func TestInitScaffoldAndGenerate(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(out, f)); err != nil {
 			t.Errorf("expected output %s: %v", f, err)
 		}
+	}
+	// The vendored builtin protos must not produce generated code.
+	if _, err := os.Stat(filepath.Join(out, "google")); !os.IsNotExist(err) {
+		t.Errorf("vendored builtin protos were code-generated into %s", filepath.Join(out, "google"))
+	}
+	if _, err := os.Stat(filepath.Join(out, "buf")); !os.IsNotExist(err) {
+		t.Errorf("vendored builtin protos were code-generated into %s", filepath.Join(out, "buf"))
 	}
 
 	// The proto's (openapi.v3.document) info must win in the generated doc.
