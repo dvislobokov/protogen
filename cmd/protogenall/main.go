@@ -4,13 +4,14 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime/debug"
 	"strings"
+
+	"github.com/dvislobokov/scmd"
 
 	"github.com/dvislobokov/protogen/internal/compile"
 	"github.com/dvislobokov/protogen/internal/config"
@@ -23,12 +24,28 @@ import (
 // When empty/dev, it falls back to the module version embedded by `go install`.
 var version = "dev"
 
-type stringList []string
+// generateOptions is the CLI contract of the root command. scmd.Value wraps
+// options whose "explicitly set on the command line" state matters: explicit
+// flags override protogenall.yaml, defaults do not (the old flag.Visit dance).
+type generateOptions struct {
+	ProtoPaths       []string           `flag:"proto_path" short:"I" help:"import path root (repeatable), like protoc -I"`
+	Out              scmd.Value[string] `flag:"out" default:"gen" help:"output directory"`
+	GoPkgPrefix      scmd.Value[string] `flag:"go-package-prefix" help:"module prefix used to synthesize go_package when a proto omits it"`
+	ProtoPkg         scmd.Value[string] `flag:"proto-package" help:"override an empty proto package on target files"`
+	OapiTitle        scmd.Value[string] `flag:"openapi-title" default:"API" help:"OpenAPI document title"`
+	OapiVersion      scmd.Value[string] `flag:"openapi-version" default:"0.0.1" help:"OpenAPI document version"`
+	OapiEnumFormat   scmd.Value[string] `flag:"openapi-enum-format" default:"string" enum:"string,number" help:"enum representation in OpenAPI (string matches grpc-gateway JSON)"`
+	DescriptorSetOut scmd.Value[string] `flag:"descriptor-set-out" help:"if set, also write a FileDescriptorSet (buf image) to this path"`
+	Generators       []string           `flag:"generators" enum:"messages,grpc,gateway,openapiv3" help:"subset of generators to run (repeatable or comma-separated; default: all)"`
+	Config           string             `flag:"config" help:"path to a protogenall.yaml (auto-detected in the CWD if present)"`
+	ListBuiltins     bool               `flag:"list-builtins" help:"print the proto import paths bundled in this binary and exit"`
 
-func (s *stringList) String() string { return strings.Join(*s, ",") }
-func (s *stringList) Set(v string) error {
-	*s = append(*s, v)
-	return nil
+	Inputs []string `arg:"..." name:"inputs" help:"proto files, directories, globs, or a project dir holding protogenall.yaml"`
+}
+
+type initOptions struct {
+	Force bool   `flag:"force" help:"overwrite files that already exist"`
+	Dir   string `arg:"dir" help:"target directory (default: current)"`
 }
 
 // settings is the resolved run configuration (flags merged over config file).
@@ -45,59 +62,46 @@ type settings struct {
 	generators       []string
 }
 
+func newApp() *scmd.App {
+	return scmd.New("protogenall",
+		"Generates Go messages, gRPC, gRPC-gateway and OpenAPI v3 from .proto files — no protoc, no plugins",
+		scmd.WithLocale(scmd.LocaleEN),
+		scmd.WithVersion(resolveVersion()),
+		scmd.Root(scmd.Cmd("", "", runGenerate)),
+		scmd.Cmd("init", "Scaffold a new protogen project (proto, protogenall.yaml, vendored third_party)", runInitCmd),
+	)
+}
+
 func main() {
-	// Subcommand form: `protogenall init [dir]` scaffolds a project.
-	if len(os.Args) > 1 && os.Args[1] == "init" {
-		if err := runInit(os.Args[2:]); err != nil {
-			fmt.Fprintln(os.Stderr, "error:", err)
-			os.Exit(1)
-		}
-		return
+	os.Exit(newApp().Run(context.Background(), os.Args[1:]))
+}
+
+func runInitCmd(ctx context.Context, o initOptions) error {
+	dir := o.Dir
+	if dir == "" {
+		dir = "."
 	}
+	return runInit(o.Force, dir)
+}
 
-	var importPaths stringList
-	flag.Var(&importPaths, "proto_path", "import path root (repeatable), like protoc -I")
-
-	out := flag.String("out", "gen", "output directory")
-	goPkgPrefix := flag.String("go-package-prefix", "", "module prefix used to synthesize go_package when a proto omits it")
-	protoPkg := flag.String("proto-package", "", "override an empty proto `package` on target files")
-	oapiTitle := flag.String("openapi-title", "API", "OpenAPI document title")
-	oapiVersion := flag.String("openapi-version", "0.0.1", "OpenAPI document version")
-	oapiEnumFormat := flag.String("openapi-enum-format", "string", "enum representation in OpenAPI: string (value names, matches grpc-gateway JSON) or number")
-	descriptorSetOut := flag.String("descriptor-set-out", "", "if set, also write a FileDescriptorSet (buf image) to this path")
-	generators := flag.String("generators", "", "comma-separated subset of messages,grpc,gateway,openapiv3 (default: all)")
-	configPath := flag.String("config", "", "path to a protogenall.yaml (auto-detected in the CWD if present)")
-	listBuiltins := flag.Bool("list-builtins", false, "print the proto import paths bundled in this binary and exit")
-	showVersion := flag.Bool("version", false, "print version and exit")
-
-	flag.Parse()
-
-	if *showVersion {
-		fmt.Println("protogenall", resolveVersion())
-		return
-	}
-
-	if *listBuiltins {
+func runGenerate(ctx context.Context, o generateOptions) error {
+	if o.ListBuiltins {
 		fmt.Println("bundled imports (no --proto_path needed):")
 		for _, p := range compile.BuiltinImports() {
 			fmt.Println("  " + p)
 		}
-		return
+		return nil
 	}
 
-	set := map[string]bool{}
-	flag.Visit(func(f *flag.Flag) { set[f.Name] = true })
-
-	inputs := flag.Args()
+	inputs := o.Inputs
 	// `protogenall <dir>` where dir is a project root (holds protogenall.yaml,
 	// e.g. created by `protogenall init <dir>`): generate that project as if
 	// run from inside it.
-	if *configPath == "" && len(inputs) == 1 {
+	if o.Config == "" && len(inputs) == 1 {
 		if st, err := os.Stat(inputs[0]); err == nil && st.IsDir() {
 			if _, err := os.Stat(filepath.Join(inputs[0], "protogenall.yaml")); err == nil {
 				if err := os.Chdir(inputs[0]); err != nil {
-					fmt.Fprintln(os.Stderr, "error:", err)
-					os.Exit(1)
+					return err
 				}
 				fmt.Println("project directory:", inputs[0])
 				inputs = nil
@@ -106,25 +110,24 @@ func main() {
 	}
 
 	s := settings{
-		importPaths:      importPaths,
+		importPaths:      o.ProtoPaths,
 		inputs:           inputs,
-		out:              *out,
-		goPkgPrefix:      *goPkgPrefix,
-		protoPkg:         *protoPkg,
-		oapiTitle:        *oapiTitle,
-		oapiVersion:      *oapiVersion,
-		oapiEnumFormat:   *oapiEnumFormat,
-		descriptorSetOut: *descriptorSetOut,
-		generators:       splitComma(*generators),
+		out:              o.Out.Get(),
+		goPkgPrefix:      o.GoPkgPrefix.Get(),
+		protoPkg:         o.ProtoPkg.Get(),
+		oapiTitle:        o.OapiTitle.Get(),
+		oapiVersion:      o.OapiVersion.Get(),
+		oapiEnumFormat:   o.OapiEnumFormat.Get(),
+		descriptorSetOut: o.DescriptorSetOut.Get(),
+		generators:       o.Generators,
 	}
 
-	if cfgPath := resolveConfigPath(*configPath); cfgPath != "" {
+	if cfgPath := resolveConfigPath(o.Config); cfgPath != "" {
 		cfg, err := config.Load(cfgPath)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "error:", err)
-			os.Exit(1)
+			return err
 		}
-		s.mergeConfig(cfg, set)
+		s.mergeConfig(cfg, o)
 		fmt.Println("using config:", cfgPath)
 	}
 
@@ -132,19 +135,13 @@ func main() {
 		s.importPaths = []string{"."}
 	}
 	if len(s.inputs) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: protogenall [flags] <proto files | directories | globs>")
-		fmt.Fprintln(os.Stderr, "       protogenall <project dir>   # a dir holding protogenall.yaml")
-		fmt.Fprintln(os.Stderr, "       protogenall init [dir]      # scaffold a new project")
-		fmt.Fprintln(os.Stderr, "  e.g. protogenall --proto_path=proto --out=gen proto   # whole tree")
-		fmt.Fprintln(os.Stderr, "  or provide inputs via protogenall.yaml (--config)")
-		flag.PrintDefaults()
-		os.Exit(2)
+		return &scmd.UsageError{Problems: []string{
+			"no inputs: pass proto files, directories or globs (e.g. `protogenall --proto_path=proto proto`),",
+			"a project dir holding protogenall.yaml, or list inputs in protogenall.yaml (--config)",
+		}}
 	}
 
-	if err := run(s); err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err)
-		os.Exit(1)
-	}
+	return run(s)
 }
 
 // resolveVersion prefers the ldflags-injected version, then the module version
@@ -174,51 +171,39 @@ func resolveConfigPath(explicit string) string {
 }
 
 // mergeConfig fills settings from cfg for any option not explicitly set on the
-// command line (explicit flags always win).
-func (s *settings) mergeConfig(c *config.Config, set map[string]bool) {
-	if !set["proto_path"] && len(c.ProtoPaths) > 0 {
+// command line (explicit flags always win; scmd.Value.IsSet tells them apart
+// from defaults).
+func (s *settings) mergeConfig(c *config.Config, o generateOptions) {
+	if len(o.ProtoPaths) == 0 && len(c.ProtoPaths) > 0 {
 		s.importPaths = c.ProtoPaths
 	}
 	if len(s.inputs) == 0 {
 		s.inputs = c.Inputs
 	}
-	if !set["out"] && c.Out != "" {
+	if !o.Out.IsSet() && c.Out != "" {
 		s.out = c.Out
 	}
-	if !set["go-package-prefix"] && c.GoPackagePrefix != "" {
+	if !o.GoPkgPrefix.IsSet() && c.GoPackagePrefix != "" {
 		s.goPkgPrefix = c.GoPackagePrefix
 	}
-	if !set["proto-package"] && c.ProtoPackage != "" {
+	if !o.ProtoPkg.IsSet() && c.ProtoPackage != "" {
 		s.protoPkg = c.ProtoPackage
 	}
-	if !set["openapi-title"] && c.OpenAPI.Title != "" {
+	if !o.OapiTitle.IsSet() && c.OpenAPI.Title != "" {
 		s.oapiTitle = c.OpenAPI.Title
 	}
-	if !set["openapi-version"] && c.OpenAPI.Version != "" {
+	if !o.OapiVersion.IsSet() && c.OpenAPI.Version != "" {
 		s.oapiVersion = c.OpenAPI.Version
 	}
-	if !set["openapi-enum-format"] && c.OpenAPI.EnumFormat != "" {
+	if !o.OapiEnumFormat.IsSet() && c.OpenAPI.EnumFormat != "" {
 		s.oapiEnumFormat = c.OpenAPI.EnumFormat
 	}
-	if !set["descriptor-set-out"] && c.DescriptorSetOut != "" {
+	if !o.DescriptorSetOut.IsSet() && c.DescriptorSetOut != "" {
 		s.descriptorSetOut = c.DescriptorSetOut
 	}
-	if !set["generators"] && len(c.Generators) > 0 {
+	if len(o.Generators) == 0 && len(c.Generators) > 0 {
 		s.generators = c.Generators
 	}
-}
-
-func splitComma(s string) []string {
-	if strings.TrimSpace(s) == "" {
-		return nil
-	}
-	var out []string
-	for _, p := range strings.Split(s, ",") {
-		if p = strings.TrimSpace(p); p != "" {
-			out = append(out, p)
-		}
-	}
-	return out
 }
 
 // expandInputs turns positional arguments — which may be individual files,

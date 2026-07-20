@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,23 +16,8 @@ import (
 // the builtin annotation protos (so IDEs resolve the imports; generation itself
 // uses the embedded copies and never code-generates them) — so that a plain
 // `protogenall` (or `protogenall <dir>`) is all that's left to run.
-func runInit(args []string) error {
-	fs := flag.NewFlagSet("init", flag.ExitOnError)
-	force := fs.Bool("force", false, "overwrite files that already exist")
-	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: protogenall init [--force] [dir]")
-		fs.PrintDefaults()
-	}
-	if err := fs.Parse(args); err != nil {
-		return err
-	}
-	if fs.NArg() > 1 {
-		return fmt.Errorf("init takes at most one directory argument, got %v", fs.Args())
-	}
-	dir := "."
-	if fs.NArg() == 1 {
-		dir = fs.Arg(0)
-	}
+// Flag parsing lives in the scmd layer (initOptions in main.go).
+func runInit(force bool, dir string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
@@ -60,7 +44,7 @@ func runInit(args []string) error {
 	fmt.Println("initializing protogen project in", dir)
 	for _, f := range files {
 		path := filepath.Join(dir, f.rel)
-		if _, err := os.Stat(path); err == nil && !*force {
+		if _, err := os.Stat(path); err == nil && !force {
 			fmt.Println("  exists, skipped:", f.rel, "(use --force to overwrite)")
 			continue
 		}

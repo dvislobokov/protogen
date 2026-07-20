@@ -17,7 +17,7 @@ func TestInitScaffoldAndGenerate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := runInit([]string{dir}); err != nil {
+	if err := runInit(false, dir); err != nil {
 		t.Fatal(err)
 	}
 
@@ -48,7 +48,7 @@ func TestInitScaffoldAndGenerate(t *testing.T) {
 	}
 
 	// Re-running without --force must not overwrite existing files.
-	if err := runInit([]string{dir}); err != nil {
+	if err := runInit(false, dir); err != nil {
 		t.Fatalf("re-init must be a no-op, got: %v", err)
 	}
 
